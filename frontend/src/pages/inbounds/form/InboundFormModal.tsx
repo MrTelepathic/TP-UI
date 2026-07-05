@@ -60,6 +60,7 @@ import {
   HysteriaFields,
   MixedFields,
   MtprotoFields,
+  OpenvpnFields,
   ShadowsocksFields,
   TunFields,
   TunnelFields,
@@ -106,6 +107,7 @@ const NODE_ELIGIBLE_PROTOCOLS = new Set<string>([
   Protocols.SHADOWSOCKS,
   Protocols.HYSTERIA,
   Protocols.WIREGUARD,
+  Protocols.OPENVPN,
 ]);
 
 function isValidShareAddrInput(value: string): boolean {
@@ -216,7 +218,8 @@ export default function InboundFormModal({
   const hasSelectableTransport =
     protocol !== Protocols.HYSTERIA
     && protocol !== Protocols.WIREGUARD
-    && protocol !== Protocols.TUNNEL;
+    && protocol !== Protocols.TUNNEL
+    && protocol !== Protocols.OPENVPN;
 
   const wPort = Form.useWatch('port', form);
   const wListen = (Form.useWatch('listen', form) ?? '') as string;
@@ -689,6 +692,8 @@ export default function InboundFormModal({
       {protocol === Protocols.MIXED && <MixedFields mixedUdpOn={mixedUdpOn} />}
 
       {protocol === Protocols.MTPROTO && <MtprotoFields />}
+
+      {protocol === Protocols.OPENVPN && <OpenvpnFields />}
 
       {protocol === Protocols.SHADOWSOCKS && <ShadowsocksFields form={form} isSSWith2022={isSSWith2022} />}
 

@@ -1,4 +1,4 @@
-// Package web provides the main web server implementation for the 3x-ui panel,
+// Package web provides the main web server implementation for the TP Panel,
 // including HTTP/HTTPS serving, routing, templates, and background job scheduling.
 package web
 

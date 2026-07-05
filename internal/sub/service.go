@@ -616,6 +616,8 @@ func (s *SubService) GetLink(inbound *model.Inbound, email string) string {
 		return s.genMtprotoLink(inbound, email)
 	case "wireguard":
 		return s.genWireguardLink(inbound, email)
+	case "openvpn":
+		return s.genOpenvpnLink(inbound, email)
 	}
 	return ""
 }
@@ -685,6 +687,30 @@ func (s *SubService) genMtprotoLink(inbound *model.Inbound, _ string) string {
 		"secret": secret,
 	}
 	return buildLinkWithParams("tg://proxy", params, "")
+}
+
+// genOpenvpnLink builds an openvpn:// share link for an OpenVPN inbound.
+// The link encodes the server address, port, and protocol so clients can
+// import it. The actual .ovpn config is downloaded separately via the API.
+func (s *SubService) genOpenvpnLink(inbound *model.Inbound, email string) string {
+	if inbound.Protocol != model.OpenVPN {
+		return ""
+	}
+	settings := map[string]any{}
+	_ = json.Unmarshal([]byte(inbound.Settings), &settings)
+	proto, _ := settings["protocol"].(string)
+	if proto == "" {
+		proto = "udp"
+	}
+	params := map[string]string{
+		"proto": proto,
+	}
+	addr := s.resolveInboundAddress(inbound)
+	return buildLinkWithParams(
+		fmt.Sprintf("openvpn://%s:%d", addr, inbound.Port),
+		params,
+		"",
+	)
 }
 
 // Protocol link generators are intentionally ordered as:

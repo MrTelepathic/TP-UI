@@ -49,6 +49,9 @@ export default function InboundInfoModal({
   const [links, setLinks] = useState<{ remark?: string; link: string }[]>([]);
   const [wireguardConfigs, setWireguardConfigs] = useState<string[]>([]);
   const [wireguardLinks, setWireguardLinks] = useState<string[]>([]);
+  const [openvpnServerRunning, setOpenvpnServerRunning] = useState(false);
+  const [openvpnConfig, setOpenvpnConfig] = useState('');
+  const [openvpnLoading, setOpenvpnLoading] = useState(false);
   const [subLink, setSubLink] = useState('');
   const [subJsonLink, setSubJsonLink] = useState('');
   const [refreshing, setRefreshing] = useState(false);
@@ -147,6 +150,19 @@ export default function InboundInfoModal({
       setWireguardLinks([]);
     }
 
+    // Load OpenVPN server status
+    if (info.protocol === Protocols.OPENVPN) {
+      setOpenvpnConfig('');
+      HttpUtil.get(`/panel/api/inbounds/${dbInbound.id}/openvpn/status`).then((msg) => {
+        if (msg?.success && msg.obj) {
+          setOpenvpnServerRunning(!!(msg.obj as { running?: boolean }).running);
+        }
+      });
+    } else {
+      setOpenvpnServerRunning(false);
+      setOpenvpnConfig('');
+    }
+
     if (clientSet?.subId) {
       setSubLink((subSettings?.subURI || '') + clientSet.subId);
       setSubJsonLink(
@@ -230,6 +246,65 @@ export default function InboundInfoModal({
   const serverNameLabel = inbound?.serverName || '';
   const showClientTab = !!clientSettings;
   const showSubscriptionTab = !!(subSettings?.enable && clientSettings?.subId);
+
+  const handleOpenvpnToggleServer = async () => {
+    if (!dbInbound) return;
+    setOpenvpnLoading(true);
+    try {
+      const action = openvpnServerRunning ? 'stop' : 'start';
+      const msg = await HttpUtil.post(`/panel/api/inbounds/${dbInbound.id}/openvpn/${action}`);
+      if (msg?.success) {
+        setOpenvpnServerRunning(!openvpnServerRunning);
+      }
+    } finally {
+      setOpenvpnLoading(false);
+    }
+  };
+
+  const handleOpenvpnDownloadConfig = async () => {
+    if (!dbInbound || !clientSettings) return;
+    setOpenvpnLoading(true);
+    try {
+      const body = {
+        serverAddr: window.location.hostname,
+        clientName: clientSettings.email || 'client',
+      };
+      const resp = await fetch(`/panel/api/inbounds/${dbInbound.id}/openvpn/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (resp.ok) {
+        const text = await resp.text();
+        setOpenvpnConfig(text);
+        downloadText(text, `${clientSettings.email || 'client'}.ovpn`);
+      }
+    } finally {
+      setOpenvpnLoading(false);
+    }
+  };
+
+  const handleOpenvpnShowConfig = async () => {
+    if (!dbInbound || !clientSettings) return;
+    setOpenvpnLoading(true);
+    try {
+      const body = {
+        serverAddr: window.location.hostname,
+        clientName: clientSettings.email || 'client',
+      };
+      const resp = await fetch(`/panel/api/inbounds/${dbInbound.id}/openvpn/download`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (resp.ok) {
+        const text = await resp.text();
+        setOpenvpnConfig(text);
+      }
+    } finally {
+      setOpenvpnLoading(false);
+    }
+  };
 
   if (!dbInbound || !inbound) {
     return (
@@ -868,6 +943,75 @@ export default function InboundInfoModal({
               )}
             </Fragment>
           ))}
+        </>
+      )}
+
+      {dbInbound.isOpenvpn && inbound.settings && (
+        <>
+          <dl className="info-list info-list-block">
+            <div className="info-row">
+              <dt>{t('pages.xray.openvpn.protocol', 'Protocol')}</dt>
+              <dd><Tag>{String(inbound.settings.protocol ?? 'udp').toUpperCase()}</Tag></dd>
+            </div>
+            <div className="info-row">
+              <dt>{t('pages.xray.openvpn.subnet', 'VPN Subnet')}</dt>
+              <dd><Tag>{String(inbound.settings.subnet ?? '10.8.0.0')}</Tag></dd>
+            </div>
+            <div className="info-row">
+              <dt>{t('pages.xray.openvpn.cipher', 'Cipher')}</dt>
+              <dd><Tag>{String(inbound.settings.cipher ?? 'AES-256-GCM')}</Tag></dd>
+            </div>
+            <div className="info-row">
+              <dt>{t('pages.xray.openvpn.auth', 'Auth')}</dt>
+              <dd><Tag>{String(inbound.settings.auth ?? 'SHA256')}</Tag></dd>
+            </div>
+            <div className="info-row">
+              <dt>{t('pages.xray.openvpn.maxClients', 'Max Clients')}</dt>
+              <dd><Tag>{String(inbound.settings.maxClients ?? 100)}</Tag></dd>
+            </div>
+            <div className="info-row">
+              <dt>{t('pages.xray.openvpn.serverStatus', 'Server Status')}</dt>
+              <dd>
+                <Tag color={openvpnServerRunning ? 'green' : 'default'}>
+                  {openvpnServerRunning ? t('pages.xray.openvpn.running', 'Running') : t('pages.xray.openvpn.stopped', 'Stopped')}
+                </Tag>
+              </dd>
+            </div>
+          </dl>
+          <div style={{ margin: '12px 0', display: 'flex', gap: 8 }}>
+            <Button
+              type={openvpnServerRunning ? 'default' : 'primary'}
+              danger={openvpnServerRunning}
+              loading={openvpnLoading}
+              onClick={handleOpenvpnToggleServer}
+            >
+              {openvpnServerRunning ? t('pages.xray.openvpn.stopServer', 'Stop Server') : t('pages.xray.openvpn.startServer', 'Start Server')}
+            </Button>
+            {clientSettings && (
+              <>
+                <Button loading={openvpnLoading} onClick={handleOpenvpnDownloadConfig}>
+                  {t('pages.xray.openvpn.downloadConfig', 'Download .ovpn')}
+                </Button>
+                <Button loading={openvpnLoading} onClick={handleOpenvpnShowConfig}>
+                  {t('pages.xray.openvpn.showConfig', 'Show Config')}
+                </Button>
+              </>
+            )}
+          </div>
+          {openvpnConfig && (
+            <div className="link-panel">
+              <div className="link-panel-header">
+                <Tag color="blue">{t('pages.xray.openvpn.clientConfig', 'Client .ovpn Config')}</Tag>
+                <Tooltip title={t('copy')}>
+                  <Button size="small" icon={<CopyOutlined />} aria-label={t('copy')} onClick={() => copyText(openvpnConfig, t)} />
+                </Tooltip>
+                <Tooltip title={t('download')}>
+                  <Button size="small" icon={<DownloadOutlined />} aria-label={t('download')} onClick={() => downloadText(openvpnConfig, `${clientSettings?.email || 'client'}.ovpn`)} />
+                </Tooltip>
+              </div>
+              <code className="link-panel-text" style={{ whiteSpace: 'pre-wrap', fontSize: 11 }}>{openvpnConfig}</code>
+            </div>
+          )}
         </>
       )}
 

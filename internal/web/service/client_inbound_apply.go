@@ -350,6 +350,10 @@ func (s *ClientService) addInboundClient(inboundSvc *InboundService, data *model
 			if client.PublicKey == "" {
 				return false, common.NewError("wireguard client requires a key")
 			}
+		case "openvpn":
+			if client.Password == "" {
+				return false, common.NewError("empty client ID")
+			}
 		default:
 			if client.ID == "" {
 				return false, common.NewError("empty client ID")
@@ -415,6 +419,13 @@ func (s *ClientService) addInboundClient(inboundSvc *InboundService, data *model
 		return nil
 	}); txErr != nil {
 		return false, txErr
+	}
+
+	// Generate OpenVPN client certificates for newly added clients.
+	if oldInbound.Protocol == model.OpenVPN {
+		if certErr := generateOpenvpnClientCerts(oldInbound, clients); certErr != nil {
+			logger.Warning("openvpn: generate client certs after add:", certErr)
+		}
 	}
 
 	// Apply to the running runtime after commit — outside the serialized writer

@@ -12,7 +12,8 @@ file locations when it can answer in one hop.
   Runs Xray-core as a managed child process (`internal/xray/process.go`) and
   imports `github.com/xtls/xray-core` for config types + gRPC stats/handler/router
   API. MTProto inbounds run a second managed child — the `mtg` binary
-  (`internal/mtproto/`) — outside Xray.
+  (`internal/mtproto/`) — outside Xray. OpenVPN inbounds run as a separate
+  managed process via `internal/web/service/openvpn.go`.
 - Storage: SQLite by default (`/etc/x-ui/x-ui.db` on Linux; the executable dir on
   Windows), PostgreSQL optional (`XUI_DB_TYPE` / `XUI_DB_DSN`). The CGo SQLite
   driver (`mattn/go-sqlite3`) needs a C compiler — `CGO_ENABLED=0` builds fail.

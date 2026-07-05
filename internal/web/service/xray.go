@@ -173,6 +173,8 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 			}
 			entry := map[string]any{"email": c.Email}
 			switch inbound.Protocol {
+			case model.OpenVPN:
+				continue
 			case model.VLESS:
 				if c.ID != "" {
 					entry["id"] = c.ID
@@ -299,6 +301,12 @@ func (s *XrayService) GetXrayConfig() (*xray.Config, error) {
 			if healed, ok := model.HealShadowsocksClientMethods(inbound.Settings); ok {
 				inbound.Settings = healed
 			}
+		}
+
+		// OpenVPN runs as a separate process, not through Xray core.
+		// Skip adding it to the Xray config entirely.
+		if inbound.Protocol == model.OpenVPN {
+			continue
 		}
 
 		inboundConfig := inbound.GenXrayInboundConfig()

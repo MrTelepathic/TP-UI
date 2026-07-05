@@ -1,4 +1,4 @@
-// Package config provides configuration management utilities for the 3x-ui panel,
+// Package config provides configuration management utilities for the TP Panel,
 // including version information, logging levels, database paths, and environment variable handling.
 package config
 

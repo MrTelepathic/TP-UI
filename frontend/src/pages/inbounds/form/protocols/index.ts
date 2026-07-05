@@ -6,4 +6,5 @@ export { default as HysteriaFields } from './hysteria';
 export { default as HttpFields } from './http';
 export { default as MixedFields } from './mixed';
 export { default as MtprotoFields } from './mtproto';
+export { default as OpenvpnFields } from './openvpn';
 export { default as VlessFields } from './vless';

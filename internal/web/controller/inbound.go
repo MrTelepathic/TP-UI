@@ -2,6 +2,7 @@ package controller
 
 import (
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
 	"strings"
@@ -79,6 +80,12 @@ func (a *InboundController) initRouter(g *gin.RouterGroup) {
 	g.POST("/import", a.importInbound)
 	g.POST("/:id/fallbacks", a.setFallbacks)
 	g.POST("/pushClientTraffics", a.pushClientTraffics)
+
+	// OpenVPN-specific endpoints
+	g.POST("/:id/openvpn/download", a.downloadOpenvpnConfig)
+	g.POST("/:id/openvpn/start", a.startOpenvpnServer)
+	g.POST("/:id/openvpn/stop", a.stopOpenvpnServer)
+	g.GET("/:id/openvpn/status", a.getOpenvpnStatus)
 }
 
 // getInbounds retrieves the list of inbounds for the logged-in user.
@@ -476,4 +483,105 @@ func (a *InboundController) setFallbacks(c *gin.Context) {
 	}
 	a.xrayService.SetToNeedRestart()
 	jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.inboundUpdateSuccess"), nil)
+}
+
+// ---------------------------------------------------------------------------
+// OpenVPN handlers
+// ---------------------------------------------------------------------------
+
+var openvpnSvc = service.NewOpenVPNService()
+
+// downloadOpenvpnConfig generates and returns a .ovpn file for the first
+// client of an OpenVPN inbound. The request body may include { "serverAddr": "..." }.
+func (a *InboundController) downloadOpenvpnConfig(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	inbound, err := a.inboundService.GetInbound(id)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	if inbound.Protocol != model.OpenVPN {
+		jsonMsg(c, "", fmt.Errorf("inbound %d is not OpenVPN", id))
+		return
+	}
+
+	type body struct {
+		ServerAddr string `json:"serverAddr"`
+		ClientName string `json:"clientName"`
+	}
+	var b body
+	_ = c.ShouldBindJSON(&b)
+	if b.ClientName == "" {
+		b.ClientName = "client"
+	}
+
+	cfg := service.DefaultServerConfig(inbound)
+	clientCert, err := openvpnSvc.GenerateClientCert(b.ClientName)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+
+	ovpnContent, err := openvpnSvc.GenerateClientOVPN(cfg, clientCert, b.ServerAddr)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s.ovpn", b.ClientName))
+	c.Data(200, "application/x-openvpn-profile", []byte(ovpnContent))
+}
+
+// startOpenvpnServer starts the OpenVPN server process for an inbound.
+func (a *InboundController) startOpenvpnServer(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	inbound, err := a.inboundService.GetInbound(id)
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	if inbound.Protocol != model.OpenVPN {
+		jsonMsg(c, "", fmt.Errorf("inbound %d is not OpenVPN", id))
+		return
+	}
+
+	cfg := service.DefaultServerConfig(inbound)
+	if err := openvpnSvc.Start(inbound, cfg); err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.inboundUpdateSuccess"), nil)
+}
+
+// stopOpenvpnServer stops the OpenVPN server process for an inbound.
+func (a *InboundController) stopOpenvpnServer(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	if err := openvpnSvc.Stop(id); err != nil {
+		jsonMsg(c, I18nWeb(c, "somethingWentWrong"), err)
+		return
+	}
+	jsonMsg(c, I18nWeb(c, "pages.inbounds.toasts.inboundUpdateSuccess"), nil)
+}
+
+// getOpenvpnStatus returns whether the OpenVPN server is running.
+func (a *InboundController) getOpenvpnStatus(c *gin.Context) {
+	id, err := strconv.Atoi(c.Param("id"))
+	if err != nil {
+		jsonMsg(c, I18nWeb(c, "get"), err)
+		return
+	}
+	running := openvpnSvc.Status(id)
+	jsonObj(c, gin.H{"running": running}, nil)
 }

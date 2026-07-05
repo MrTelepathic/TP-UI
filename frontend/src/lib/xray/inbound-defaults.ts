@@ -11,6 +11,7 @@ import type { TunnelInboundSettings } from '@/schemas/protocols/inbound/tunnel';
 import type { VlessClient, VlessInboundSettings } from '@/schemas/protocols/inbound/vless';
 import type { VmessClient, VmessInboundSettings } from '@/schemas/protocols/inbound/vmess';
 import type { WireguardInboundSettings } from '@/schemas/protocols/inbound/wireguard';
+import type { OpenvpnInboundSettings } from '@/schemas/protocols/inbound/openvpn';
 
 // Plain-object factories for protocol clients. Each returns a Zod-parsable
 // object matching the wire shape. Random fields (id, password, auth,
@@ -281,6 +282,31 @@ export function createDefaultWireguardInboundSettings(
   };
 }
 
+export interface OpenvpnClientSeed extends ClientBaseSeed {
+  password?: string;
+}
+
+export function createDefaultOpenvpnClient(seed: OpenvpnClientSeed = {}): import('@/schemas/protocols/inbound/openvpn').OpenvpnClient {
+  return {
+    password: seed.password ?? RandomUtil.randomSeq(16),
+    ...clientBase(seed),
+  };
+}
+
+export function createDefaultOpenvpnInboundSettings(): OpenvpnInboundSettings {
+  return {
+    protocol: 'udp',
+    subnet: '10.8.0.0',
+    netmask: '255.255.255.0',
+    cipher: 'AES-256-GCM',
+    auth: 'SHA256',
+    keepalive: 10,
+    maxClients: 100,
+    dns: ['8.8.8.8', '8.8.4.4'],
+    clients: [],
+  };
+}
+
 // Protocol-aware dispatch over every inbound-settings factory. Mirrors
 // the legacy `Inbound.Settings.getSettings(protocol)` dispatcher, but
 // returns a plain Zod-parsable object instead of a class instance.
@@ -297,7 +323,8 @@ export type AnyInboundSettings =
   | TunInboundSettings
   | TunnelInboundSettings
   | WireguardInboundSettings
-  | MtprotoInboundSettings;
+  | MtprotoInboundSettings
+  | OpenvpnInboundSettings;
 
 export function createDefaultInboundSettings(protocol: string): AnyInboundSettings | null {
   switch (protocol) {
@@ -312,6 +339,7 @@ export function createDefaultInboundSettings(protocol: string): AnyInboundSettin
     case 'tun':         return createDefaultTunInboundSettings();
     case 'wireguard':   return createDefaultWireguardInboundSettings();
     case 'mtproto':     return createDefaultMtprotoInboundSettings();
+    case 'openvpn':     return createDefaultOpenvpnInboundSettings();
     default:            return null;
   }
 }

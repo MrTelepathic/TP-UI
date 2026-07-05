@@ -1,4 +1,4 @@
-// Package service provides business logic services for the 3x-ui web panel,
+// Package service provides business logic services for the TP Panel web panel,
 // including inbound/outbound management, user administration, settings, and Xray integration.
 package service
 
@@ -711,6 +711,10 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 			if client.Auth == "" {
 				return inbound, false, common.NewError("empty client ID")
 			}
+		case "openvpn":
+			if client.Password == "" {
+				return inbound, false, common.NewError("empty client ID")
+			}
 		default:
 			if client.ID == "" {
 				return inbound, false, common.NewError("empty client ID")
@@ -773,6 +777,15 @@ func (s *InboundService) AddInbound(inbound *model.Inbound) (*model.Inbound, boo
 
 	if err = s.clientService.SyncInbound(tx, inbound.Id, clients); err != nil {
 		return inbound, false, err
+	}
+
+	// Generate OpenVPN client certificates for each client on OpenVPN inbounds.
+	// Each client needs a signed certificate on disk so the OpenVPN server can
+	// verify their TLS handshake.
+	if inbound.Protocol == model.OpenVPN {
+		if err = generateOpenvpnClientCerts(inbound, clients); err != nil {
+			return inbound, false, err
+		}
 	}
 
 	// Legacy import: an inbound exported from a build that predated the hosts

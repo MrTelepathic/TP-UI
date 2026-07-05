@@ -793,6 +793,27 @@ export function genMtprotoLink(input: GenMtprotoLinkInput): string {
   return url.toString();
 }
 
+export interface GenOpenvpnLinkInput {
+  inbound: Inbound;
+  address: string;
+  port?: number;
+  remark?: string;
+  clientPassword: string;
+}
+
+// OpenVPN "share link" — returns an openvpn:// URI that encodes the server
+// address and client password. Clients import this to auto-configure.
+export function genOpenvpnLink(input: GenOpenvpnLinkInput): string {
+  const { inbound, address, port = inbound.port, remark = '', clientPassword } = input;
+  if (inbound.protocol !== 'openvpn') return '';
+  const proto = (inbound.settings.protocol as string) ?? 'udp';
+  const url = new URL(`openvpn://${formatUrlHost(address)}:${port}`);
+  url.searchParams.set('proto', proto);
+  if (clientPassword) url.searchParams.set('password', clientPassword);
+  url.hash = encodeURIComponent(remark);
+  return url.toString();
+}
+
 export interface GenWireguardLinkInput {
   settings: WireguardInboundSettings;
   address: string;
@@ -1084,7 +1105,7 @@ export interface GenLinkInput {
 // Per-protocol dispatcher matching the legacy `genLink` switch. Returns
 // '' for protocols that don't have client-based share links (wireguard
 // goes through genWireguardLinks/Configs separately, http/mixed/tunnel
-// don't have share URLs).
+// don't have share URLs, openvpn uses .ovpn config files instead of URLs).
 export function genLink(input: GenLinkInput): string {
   const { inbound, address, port = inbound.port, forceTls = 'same', remark = '', client, externalProxy = null } = input;
   switch (inbound.protocol) {
@@ -1126,6 +1147,8 @@ export function genLink(input: GenLinkInput): string {
       });
     case 'mtproto':
       return genMtprotoLink({ inbound, address, port });
+    case 'openvpn':
+      return genOpenvpnLink({ inbound, address, port, remark, clientPassword: client.password ?? '' });
     default:
       return '';
   }

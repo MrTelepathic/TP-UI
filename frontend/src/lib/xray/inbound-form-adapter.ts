@@ -2,6 +2,7 @@ import type { InboundFormValues, ShareAddrStrategy, TrafficReset } from '@/schem
 import type { InboundSettings } from '@/schemas/protocols/inbound';
 import {
   HysteriaClientSchema,
+  OpenvpnClientSchema,
   ShadowsocksClientSchema,
   TrojanClientSchema,
   VlessClientSchema,
@@ -238,6 +239,7 @@ function clientSchemaForProtocol(protocol: string): z.ZodType | null {
     case 'shadowsocks': return ShadowsocksClientSchema;
     case 'hysteria': return HysteriaClientSchema;
     case 'wireguard': return WireguardClientSchema;
+    case 'openvpn': return OpenvpnClientSchema;
     default: return null;
   }
 }

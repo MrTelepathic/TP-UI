@@ -1,5 +1,5 @@
 [Unit]
-Description=x-ui Service
+Description=TP Panel Service
 After=network.target
 Wants=network.target
 

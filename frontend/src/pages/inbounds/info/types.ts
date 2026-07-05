@@ -65,6 +65,7 @@ export interface DBInboundLike {
   isMixed?: boolean;
   isHTTP?: boolean;
   isWireguard?: boolean;
+  isOpenvpn?: boolean;
   settings: unknown;
   streamSettings: unknown;
   sniffing: unknown;
